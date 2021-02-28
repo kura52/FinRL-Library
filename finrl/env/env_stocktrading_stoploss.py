@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -109,11 +110,11 @@ class StockTradingEnvStopLoss(gym.Env):
         self.cached_data = None
         self.cash_penalty_proportion = cash_penalty_proportion
         if self.cache_indicator_data:
-            print("caching data")
+            logging.info("caching data")
             self.cached_data = [
                 self.get_date_vector(i) for i, _ in enumerate(self.dates)
             ]
-            print("data cached!")
+            logging.info("data cached!")
     def seed(self, seed=None):
         if seed is None:
             seed = int(round(time.time() * 1000))
@@ -221,10 +222,10 @@ class StockTradingEnvStopLoss(gym.Env):
             f"{cash_pct*100:0.2f}%",
         ]
         self.episode_history.append(rec)
-        print(self.template.format(*rec))
+        logging.info(self.template.format(*rec))
     def log_header(self):
         self.template = "{0:4}|{1:4}|{2:15}|{3:15}|{4:15}|{5:10}|{6:10}|{7:10}"  # column widths: 8, 10, 15, 7, 10
-        print(
+        logging.info(
             self.template.format(
                 "EPISODE",
                 "STEPS",

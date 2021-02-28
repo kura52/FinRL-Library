@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 from stockstats import StockDataFrame as Sdf
@@ -46,17 +47,17 @@ class FeatureEngineer:
         if self.use_technical_indicator == True:
             # add technical indicators using stockstats
             df = self.add_technical_indicator(df)
-            print("Successfully added technical indicators")
+            logging.info("Successfully added technical indicators")
 
         # add turbulence index for multiple stock
         if self.use_turbulence == True:
             df = self.add_turbulence(df)
-            print("Successfully added turbulence index")
+            logging.info("Successfully added turbulence index")
 
         # add user defined feature
         if self.user_defined_feature == True:
             df = self.add_user_defined_feature(df)
-            print("Successfully added user defined features")
+            logging.info("Successfully added user defined features")
 
         # fill the missing values at the beginning and the end
         df = df.fillna(method="bfill").fillna(method="ffill")
@@ -83,7 +84,7 @@ class FeatureEngineer:
                         temp_indicator, ignore_index=True
                     )
                 except Exception as e:
-                    print(e)
+                    logging.info(e)
             df[indicator] = indicator_df
         return df
 

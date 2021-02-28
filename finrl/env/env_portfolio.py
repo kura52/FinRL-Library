@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 from gym.utils import seeding
@@ -121,9 +122,9 @@ class StockPortfolioEnv(gym.Env):
         self.date_memory = [self.data.date.unique()[0]]
 
     def step(self, actions):
-        # print(self.day)
+        # logging.info(self.day)
         self.terminal = self.day >= len(self.df.index.unique()) - 1
-        # print(actions)
+        # logging.info(actions)
 
         if self.terminal:
             df = pd.DataFrame(self.portfolio_return_memory)
@@ -136,9 +137,9 @@ class StockPortfolioEnv(gym.Env):
             plt.savefig("results/rewards.png")
             plt.close()
 
-            print("=================================")
-            print("begin_total_asset:{}".format(self.asset_memory[0]))
-            print("end_total_asset:{}".format(self.portfolio_value))
+            logging.info("=================================")
+            logging.info("begin_total_asset:{}".format(self.asset_memory[0]))
+            logging.info("end_total_asset:{}".format(self.portfolio_value))
 
             df_daily_return = pd.DataFrame(self.portfolio_return_memory)
             df_daily_return.columns = ["daily_return"]
@@ -148,13 +149,13 @@ class StockPortfolioEnv(gym.Env):
                     * df_daily_return["daily_return"].mean()
                     / df_daily_return["daily_return"].std()
                 )
-                print("Sharpe: ", sharpe)
-            print("=================================")
+                logging.info(f"Sharpe: {sharpe}")
+            logging.info("=================================")
 
             return self.state, self.reward, self.terminal, {}
 
         else:
-            # print("Model actions: ",actions)
+            # logging.info("Model actions: ",actions)
             # actions are the portfolio weight
             # normalize to sum of 1
             # if (np.array(actions) - np.array(actions).min()).sum() != 0:
@@ -162,7 +163,7 @@ class StockPortfolioEnv(gym.Env):
             # else:
             #  norm_actions = actions
             weights = self.softmax_normalization(actions)
-            # print("Normalized actions: ", weights)
+            # logging.info("Normalized actions: ", weights)
             self.actions_memory.append(weights)
             last_day_memory = self.data
 
@@ -175,7 +176,7 @@ class StockPortfolioEnv(gym.Env):
                 [self.data[tech].values.tolist() for tech in self.tech_indicator_list],
                 axis=0,
             )
-            # print(self.state)
+            # logging.info(self.state)
             # calcualte portfolio return
             # individual stocks' return * weight
             portfolio_return = sum(
@@ -192,7 +193,7 @@ class StockPortfolioEnv(gym.Env):
 
             # the reward is the new portfolio value or end portfolo value
             self.reward = new_portfolio_value
-            # print("Step reward: ", self.reward)
+            # logging.info("Step reward: ", self.reward)
             # self.reward = self.reward*self.reward_scaling
 
         return self.state, self.reward, self.terminal, {}
@@ -229,8 +230,8 @@ class StockPortfolioEnv(gym.Env):
     def save_asset_memory(self):
         date_list = self.date_memory
         portfolio_return = self.portfolio_return_memory
-        # print(len(date_list))
-        # print(len(asset_list))
+        # logging.info(len(date_list))
+        # logging.info(len(asset_list))
         df_account_value = pd.DataFrame(
             {"date": date_list, "daily_return": portfolio_return}
         )

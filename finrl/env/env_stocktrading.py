@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 from gym.utils import seeding
@@ -133,7 +134,7 @@ class StockTradingEnv(gym.Env):
             if self.state[index+1]>0: 
                 #Buy only if the price is > 0 (no missing data in this particular date)       
                 available_amount = self.state[0] // self.state[index+1]
-                # print('available_amount:{}'.format(available_amount))
+                # logging.info('available_amount:{}'.format(available_amount))
                 
                 #update balance
                 buy_num_shares = min(available_amount, action)
@@ -169,7 +170,7 @@ class StockTradingEnv(gym.Env):
     def step(self, actions):
         self.terminal = self.day >= len(self.df.index.unique())-1
         if self.terminal:
-            # print(f"Episode: {self.episode}")
+            # logging.info(f"Episode: {self.episode}")
             if self.make_plots:
                 self._make_plot()            
             end_total_asset = self.state[0]+ \
@@ -186,15 +187,15 @@ class StockTradingEnv(gym.Env):
             df_rewards.columns = ['account_rewards']
             df_rewards['date'] = self.date_memory[:-1]
             if self.episode % self.print_verbosity == 0:
-                print(f"day: {self.day}, episode: {self.episode}")
-                print(f"begin_total_asset: {self.asset_memory[0]:0.2f}")
-                print(f"end_total_asset: {end_total_asset:0.2f}")
-                print(f"total_reward: {tot_reward:0.2f}")
-                print(f"total_cost: {self.cost:0.2f}")
-                print(f"total_trades: {self.trades}")
+                logging.info(f"day: {self.day}, episode: {self.episode}")
+                logging.info(f"begin_total_asset: {self.asset_memory[0]:0.2f}")
+                logging.info(f"end_total_asset: {end_total_asset:0.2f}")
+                logging.info(f"total_reward: {tot_reward:0.2f}")
+                logging.info(f"total_cost: {self.cost:0.2f}")
+                logging.info(f"total_trades: {self.trades}")
                 if df_total_value['daily_return'].std() != 0:
-                    print(f"Sharpe: {sharpe:0.3f}")
-                print("=================================")
+                    logging.info(f"Sharpe: {sharpe:0.3f}")
+                logging.info("=================================")
 
             if (self.model_name!='') and (self.mode!=''):
                 df_actions = self.save_action_memory()
@@ -223,7 +224,7 @@ class StockTradingEnv(gym.Env):
                     actions=np.array([-self.hmax]*self.stock_dim)
             begin_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(self.stock_dim+1)])*np.array(self.state[(self.stock_dim+1):(self.stock_dim*2+1)]))
-            #print("begin_total_asset:{}".format(begin_total_asset))
+            #logging.info("begin_total_asset:{}".format(begin_total_asset))
             
             argsort_actions = np.argsort(actions)
             
@@ -231,14 +232,14 @@ class StockTradingEnv(gym.Env):
             buy_index = argsort_actions[::-1][:np.where(actions > 0)[0].shape[0]]
 
             for index in sell_index:
-                # print(f"Num shares before: {self.state[index+self.stock_dim+1]}")
-                # print(f'take sell action before : {actions[index]}')
+                # logging.info(f"Num shares before: {self.state[index+self.stock_dim+1]}")
+                # logging.info(f'take sell action before : {actions[index]}')
                 actions[index] = self._sell_stock(index, actions[index]) * (-1)
-                # print(f'take sell action after : {actions[index]}')
-                # print(f"Num shares after: {self.state[index+self.stock_dim+1]}")
+                # logging.info(f'take sell action after : {actions[index]}')
+                # logging.info(f"Num shares after: {self.state[index+self.stock_dim+1]}")
 
             for index in buy_index:
-                # print('take buy action: {}'.format(actions[index]))
+                # logging.info('take buy action: {}'.format(actions[index]))
                 actions[index] = self._buy_stock(index, actions[index])
 
             self.actions_memory.append(actions)
@@ -346,8 +347,8 @@ class StockTradingEnv(gym.Env):
     def save_asset_memory(self):
         date_list = self.date_memory
         asset_list = self.asset_memory
-        #print(len(date_list))
-        #print(len(asset_list))
+        #logging.info(len(date_list))
+        #logging.info(len(asset_list))
         df_account_value = pd.DataFrame({'date':date_list,'account_value':asset_list})
         return df_account_value
 

@@ -21,6 +21,9 @@ def build_parser():
 
 
 def main():
+    logging.basicConfig(level=logging.INFO,
+                        format='[%(asctime)s] %(module)s.%(funcName)s %(levelname)s %(message)s - [%(pathname)s(%(lineno)s)]')
+
     parser = build_parser()
     options = parser.parse_args()
     if not os.path.exists("./" + config.DATA_SAVE_DIR):

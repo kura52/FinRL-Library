@@ -1,7 +1,7 @@
 """Contains methods and classes to collect data from
 Yahoo Finance API
 """
-
+import logging
 import pandas as pd
 import yfinance as yf
 
@@ -68,7 +68,7 @@ class YahooDownloader:
             # drop the adjusted close price column
             data_df = data_df.drop("adjcp", 1)
         except NotImplementedError:
-            print("the features are not supported currently")
+            logging.info("the features are not supported currently")
         # create day of the week column (monday = 0)
         data_df["day"] = data_df["date"].dt.dayofweek
         # convert date to standard string format, easy to filter
@@ -76,8 +76,8 @@ class YahooDownloader:
         # drop missing data
         data_df = data_df.dropna()
         data_df = data_df.reset_index(drop=True)
-        print("Shape of DataFrame: ", data_df.shape)
-        # print("Display DataFrame: ", data_df.head())
+        logging.info(f"Shape of DataFrame: {data_df.shape}")
+        # logging.info("Display DataFrame: ", data_df.head())
 
         data_df = data_df.sort_values(by=['date','tic']).reset_index(drop=True)
 

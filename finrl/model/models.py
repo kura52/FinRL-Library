@@ -1,4 +1,5 @@
 # common library
+import logging
 import pandas as pd
 import numpy as np
 import time
@@ -83,7 +84,7 @@ class DRLAgent:
               account_memory = test_env.env_method(method_name="save_asset_memory")
               actions_memory = test_env.env_method(method_name="save_action_memory")
             if dones[0]:
-                print("hit end!")
+                logging.info("hit end!")
                 break
         return account_memory[0], actions_memory[0]
 
@@ -109,7 +110,7 @@ class DRLAgent:
             model_kwargs["action_noise"] = NOISE[model_kwargs["action_noise"]](
                 mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions)
             )
-        print(model_kwargs)
+        logging.info(model_kwargs)
         model = MODELS[model_name](
             policy=policy,
             env=self.env,
@@ -147,7 +148,7 @@ class DRLEnsembleAgent:
             temp_model_kwargs["action_noise"] = NOISE[temp_model_kwargs["action_noise"]](
                 mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions)
             )
-        print(temp_model_kwargs)
+        logging.info(temp_model_kwargs)
         model = MODELS[model_name](
             policy=policy,
             env=env,
@@ -241,7 +242,7 @@ class DRLEnsembleAgent:
             action, _states = model.predict(trade_obs)
             trade_obs, rewards, dones, info = trade_env.step(action)
             if i == (len(trade_data.index.unique()) - 2):
-                # print(env_test.render())
+                # logging.info(env_test.render())
                 last_state = trade_env.render()
 
         df_last_state = pd.DataFrame({'last_state': last_state})
@@ -250,7 +251,7 @@ class DRLEnsembleAgent:
 
     def run_ensemble_strategy(self,A2C_model_kwargs,PPO_model_kwargs,DDPG_model_kwargs,timesteps_dict):
         """Ensemble Strategy that combines PPO, A2C and DDPG"""
-        print("============Start Ensemble Strategy============")
+        logging.info("============Start Ensemble Strategy============")
         # for ensemble model, it's necessary to feed the last state
         # of the previous model to the current model as the initial state
         last_state_ensemble = []
@@ -276,7 +277,7 @@ class DRLEnsembleAgent:
             validation_end_date_list.append(validation_end_date)
             iteration_list.append(i)
 
-            print("============================================")
+            logging.info("============================================")
             ## initial state is empty
             if i - self.rebalance_window - self.validation_window == 0:
                 # inital state
@@ -296,7 +297,7 @@ class DRLEnsembleAgent:
 
             historical_turbulence_mean = np.mean(historical_turbulence.turbulence.values)
 
-            print(historical_turbulence_mean)
+            logging.info(historical_turbulence_mean)
 
             if historical_turbulence_mean > insample_turbulence_threshold:
                 # if the mean of the historical data is greater than the 90% quantile of insample turbulence data
@@ -308,7 +309,7 @@ class DRLEnsembleAgent:
                 # if the mean of the historical data is less than the 90% quantile of insample turbulence data
                 # then we tune up the turbulence_threshold, meaning we lower the risk
                 turbulence_threshold = np.quantile(insample_turbulence.turbulence.values, 1)
-            print("turbulence_threshold: ", turbulence_threshold)
+            logging.info(f"turbulence_threshold: {turbulence_threshold}")
 
             ############## Environment Setup starts ##############
             ## training env
@@ -330,15 +331,14 @@ class DRLEnsembleAgent:
             ############## Environment Setup ends ##############
 
             ############## Training and Validation starts ##############
-            print("======Model training from: ", self.train_period[0], "to ",
-                  self.unique_trade_date[i - self.rebalance_window - self.validation_window])
-            # print("training: ",len(data_split(df, start=20090000, end=test.datadate.unique()[i-rebalance_window]) ))
-            # print("==============Model Training===========")
-            print("======A2C Training========")
+            logging.info(f"======Model training from: {self.train_period[0]} to {self.unique_trade_date[i - self.rebalance_window - self.validation_window]}")
+            # logging.info("training: ",len(data_split(df, start=20090000, end=test.datadate.unique()[i-rebalance_window]) ))
+            # logging.info("==============Model Training===========")
+            logging.info("======A2C Training========")
             model_a2c = self.get_model("a2c",self.train_env,policy="MlpPolicy",model_kwargs=A2C_model_kwargs)
             model_a2c = self.train_model(model_a2c, "a2c", tb_log_name="a2c_{}".format(i), iter_num = i, total_timesteps=timesteps_dict['a2c']) #100_000
 
-            print("======A2C Validation from: ", validation_start_date, "to ",validation_end_date)
+            logging.info(f"======A2C Validation from: {validation_start_date} to {validation_end_date}")
             val_env_a2c = DummyVecEnv([lambda: StockTradingEnv(validation,
                                                                 self.stock_dim,
                                                                 self.hmax,
@@ -357,12 +357,12 @@ class DRLEnsembleAgent:
             val_obs_a2c = val_env_a2c.reset()
             self.DRL_validation(model=model_a2c,test_data=validation,test_env=val_env_a2c,test_obs=val_obs_a2c)
             sharpe_a2c = self.get_validation_sharpe(i,model_name="A2C")
-            print("A2C Sharpe Ratio: ", sharpe_a2c)
+            logging.info(f"A2C Sharpe Ratio: {sharpe_a2c}")
 
-            print("======PPO Training========")
+            logging.info("======PPO Training========")
             model_ppo = self.get_model("ppo",self.train_env,policy="MlpPolicy",model_kwargs=PPO_model_kwargs)
             model_ppo = self.train_model(model_ppo, "ppo", tb_log_name="ppo_{}".format(i), iter_num = i, total_timesteps=timesteps_dict['ppo']) #100_000
-            print("======PPO Validation from: ", validation_start_date, "to ",validation_end_date)
+            logging.info(f"======PPO Validation from: {validation_start_date} to {validation_end_date}")
             val_env_ppo = DummyVecEnv([lambda: StockTradingEnv(validation,
                                                                 self.stock_dim,
                                                                 self.hmax,
@@ -381,12 +381,12 @@ class DRLEnsembleAgent:
             val_obs_ppo = val_env_ppo.reset()
             self.DRL_validation(model=model_ppo,test_data=validation,test_env=val_env_ppo,test_obs=val_obs_ppo)
             sharpe_ppo = self.get_validation_sharpe(i,model_name="PPO")
-            print("PPO Sharpe Ratio: ", sharpe_ppo)
+            logging.info(f"PPO Sharpe Ratio: {sharpe_ppo}")
 
-            print("======DDPG Training========")
+            logging.info("======DDPG Training========")
             model_ddpg = self.get_model("ddpg",self.train_env,policy="MlpPolicy",model_kwargs=DDPG_model_kwargs)
             model_ddpg = self.train_model(model_ddpg, "ddpg", tb_log_name="ddpg_{}".format(i), iter_num = i, total_timesteps=timesteps_dict['ddpg'])  #50_000
-            print("======DDPG Validation from: ", validation_start_date, "to ",validation_end_date)
+            logging.info(f"======DDPG Validation from: {validation_start_date} to {validation_end_date}")
             val_env_ddpg = DummyVecEnv([lambda: StockTradingEnv(validation,
                                                                 self.stock_dim,
                                                                 self.hmax,
@@ -410,8 +410,7 @@ class DRLEnsembleAgent:
             a2c_sharpe_list.append(sharpe_a2c)
             ddpg_sharpe_list.append(sharpe_ddpg)
 
-            print("======Best Model Retraining from: ", self.train_period[0], "to ",
-                  self.unique_trade_date[i - self.rebalance_window])
+            logging.info(f"======Best Model Retraining from: {self.train_period[0]} to {self.unique_trade_date[i - self.rebalance_window]}")
             # Environment setup for model retraining up to first trade date
             train_full = data_split(self.df, start=self.train_period[0], end=self.unique_trade_date[i - self.rebalance_window])
             self.train_full_env = DummyVecEnv([lambda: StockTradingEnv(train_full,
@@ -445,8 +444,8 @@ class DRLEnsembleAgent:
             ############## Training and Validation ends ##############
 
             ############## Trading starts ##############
-            print("======Trading from: ", self.unique_trade_date[i - self.rebalance_window], "to ", self.unique_trade_date[i])
-            #print("Used Model: ", model_ensemble)
+            logging.info(f"======Trading from: {self.unique_trade_date[i - self.rebalance_window]} to {self.unique_trade_date[i]}")
+            #logging.info("Used Model: ", model_ensemble)
             last_state_ensemble = self.DRL_prediction(model=model_ensemble, name="ensemble",
                                                      last_state=last_state_ensemble, iter_num=i,
                                                      turbulence_threshold = turbulence_threshold,
@@ -454,7 +453,7 @@ class DRLEnsembleAgent:
             ############## Trading ends ##############
 
         end = time.time()
-        print("Ensemble Strategy took: ", (end - start) / 60, " minutes")
+        logging.info(f"Ensemble Strategy took: {(end - start) / 60} minutes")
 
         df_summary = pd.DataFrame([iteration_list,validation_start_date_list,validation_end_date_list,model_use,a2c_sharpe_list,ppo_sharpe_list,ddpg_sharpe_list]).T
         df_summary.columns = ['Iter','Val Start','Val End','Model Used','A2C Sharpe','PPO Sharpe','DDPG Sharpe']
