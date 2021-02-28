@@ -15,7 +15,7 @@ from finrl.preprocessing.preprocessors import FeatureEngineer
 from finrl.preprocessing.data import data_split
 from finrl.env.env_stocktrading import StockTradingEnv
 from finrl.model.models import DRLAgent
-# from finrl.trade.backtest import BackTestStats
+from finrl.trade.backtest import backtest_stats, backtest_plot
 
 
 def train_one():
@@ -24,28 +24,36 @@ def train_one():
     """
     logging.info("==============Start Fetching Data===========")
 
-    # df = YahooDownloader(
-    #     start_date=config.START_DATE,
-    #     end_date=config.END_DATE,
-    #     ticker_list=config.DOW_30_TICKER,
-    # ).fetch_data()
-    # df.to_csv('df.csv')
+    do_download = True
+    do_train = True
 
-    df = pd.read_csv('df.txt')
+    if do_download:
+        df = YahooDownloader(
+            start_date=config.START_DATE,
+            end_date=config.END_DATE,
+            ticker_list=config.DOW_30_TICKER,
+        ).fetch_data()
+        df.to_csv('df.txt')
+    else:
+        df = pd.read_csv('df.txt')
 
     logging.info("==============Start Feature Engineering===========")
-    # fe = FeatureEngineer(
-    #     use_technical_indicator=True,
-    #     tech_indicator_list=config.TECHNICAL_INDICATORS_LIST,
-    #     use_turbulence=True,
-    #     user_defined_feature=False,
-    # )
-    # with open('fe.pickle', 'wb') as f: pickle.dump(fe, f)
-    with open('fe.pickle', 'rb') as f: fe = pickle.load(f)
+    if do_download:
+        fe = FeatureEngineer(
+            use_technical_indicator=True,
+            tech_indicator_list=config.TECHNICAL_INDICATORS_LIST,
+            use_turbulence=True,
+            user_defined_feature=False,
+        )
+        with open('fe.pickle', 'wb') as f: pickle.dump(fe, f)
+    else:
+        with open('fe.pickle', 'rb') as f: fe = pickle.load(f)
 
-    # processed = fe.preprocess_data(df)
-    # with open('processed.pickle', 'wb') as f: pickle.dump(processed, f)
-    with open('processed.pickle', 'rb') as f: processed = pickle.load(f)
+    if do_download:
+        processed = fe.preprocess_data(df)
+        with open('processed.pickle', 'wb') as f: pickle.dump(processed, f)
+    else:
+        with open('processed.pickle', 'rb') as f: processed = pickle.load(f)
 
     # Training & Trading data split
     train = data_split(processed, config.START_DATE, config.START_TRADE_DATE)
@@ -86,11 +94,15 @@ def train_one():
     now = datetime.datetime.now().strftime("%Y%m%d-%Hh%M")
 
     model_sac = agent.get_model("sac")
-    trained_sac = agent.train_model(
-        model=model_sac, tb_log_name="sac", total_timesteps=80000
-    )
-    with open('trained_sac.pickle', 'wb') as f: pickle.dump(trained_sac, f)
-    with open('trained_sac.pickle', 'rb') as f: trained_sac = pickle.load(f)
+
+    if do_train:
+        trained_sac = agent.train_model(
+            model=model_sac, tb_log_name="sac", total_timesteps=10000
+        )
+        trained_sac.save_replay_buffer("trained_sac")
+    else:
+        trained_sac = model_sac
+        trained_sac.load_replay_buffer("trained_sac")
 
     logging.info("==============Start Trading===========")
     df_account_value, df_actions = DRLAgent.DRL_prediction(
@@ -102,6 +114,7 @@ def train_one():
     df_actions.to_csv("./" + config.RESULTS_DIR + "/df_actions_" + now + ".csv")
 
     logging.info("==============Get Backtest Results===========")
-    # perf_stats_all = BackTestStats(df_account_value)
-    # perf_stats_all = pd.DataFrame(perf_stats_all)
-    # perf_stats_all.to_csv("./" + config.RESULTS_DIR + "/perf_stats_all_" + now + ".csv")
+    perf_stats_all = backtest_stats(df_account_value)
+    perf_stats_all = pd.DataFrame(perf_stats_all)
+    perf_stats_all.to_csv("./" + config.RESULTS_DIR + "/perf_stats_all_" + now + ".csv")
+    # backtest_plot(account_value=df_account_value, baseline_ticker="^DJI")
