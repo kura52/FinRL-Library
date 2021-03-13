@@ -32,17 +32,26 @@ RESULTS_DIR = f"results"
 
 ## time_fmt = '%Y-%m-%d'
 START_DATE = "2008-03-19"
-END_DATE = "2021-01-01"
+START2_DATE = "2008-05-19"
+END_DATE = "2012-05-19"
 
 START_TRADE_DATE = "2019-01-01"
+START_TRADE_DATE = "2011-05-19"
 
 ## dataset default columns
 DEFAULT_DATA_COLUMNS = ["date", "tic", "close"]
 
 ## stockstats technical indicator column names
 ## check https://pypi.org/project/stockstats/ for different names
-TECHNICAL_INDICATORS_LIST = ["macd","boll_ub","boll_lb","rsi_30", "cci_30", "dx_30","close_30_sma","close_60_sma"]
+#TECHNICAL_INDICATORS_LIST = ["macd","boll_ub","boll_lb","rsi_30", "cci_30", "dx_30","close_30_sma","close_60_sma"]
+#TECHNICAL_INDICATORS_LIST = ["macdh","boll_ub","boll_lb","rsi_20", "cci_20", "dx_20","close_20_sma","close_50_sma"]
 
+#TECHNICAL_INDICATORS_LIST = ["rsi_20", "cci_20", "dx_20"]
+TECHNICAL_INDICATORS_LIST = []
+# USER_DEFINED_LIST = ["macdh_normalize", "boll_ub_normalize", "boll_lb_normalize", "close_20_sma_normalize", "close_50_sma_normalize"]
+USER_DEFINED_LIST = ["macdh_normalize", "close_20_sma_normalize", "close_50_sma_normalize"]
+# TECHNICAL_INDICATORS_LIST = []
+# USER_DEFINED_LIST = ["macdh_normalize"]
 
 ## Model Parameters
 A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.01, "learning_rate": 0.0007}
@@ -95,6 +104,48 @@ SRI_KEHATI_TICKER = [
 		"WSKT.JK",
 		"WTON.JK"
 ]
+TICKERS = [
+    "AAPL",
+    "MSFT",
+    "JPM",
+    "V",
+    "RTX",
+    "PG",
+    "GS",
+    "NKE",
+    "DIS",
+    "AXP",
+    "HD",
+    "INTC",
+    "WMT",
+    "IBM",
+    "MRK",
+    "UNH",
+    "KO",
+    "CAT",
+    "TRV",
+    "JNJ",
+    "CVX",
+    "MCD",
+    "VZ",
+    "CSCO",
+    "XOM",
+    "BA",
+    "MMM",
+    "PFE",
+    "WBA",
+    "DD",
+]
+
+#     [
+#     # "^DJI",
+#     "^GSPC",
+#     # "^NDX",
+#     # "AAPL",
+#     # "MSFT",
+#     #  "IBM",
+# ]
+
 
 # check https://wrds-www.wharton.upenn.edu/ for U.S. index constituents
 # Dow 30 constituents at 2019/01

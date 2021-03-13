@@ -72,20 +72,10 @@ class FeatureEngineer:
         """
         df = data.copy()
         stock = Sdf.retype(df.copy())
-        unique_ticker = stock.tic.unique()
 
         for indicator in self.tech_indicator_list:
-            indicator_df = pd.DataFrame()
-            for i in range(len(unique_ticker)):
-                try:
-                    temp_indicator = stock[stock.tic == unique_ticker[i]][indicator]
-                    temp_indicator = pd.DataFrame(temp_indicator)
-                    indicator_df = indicator_df.append(
-                        temp_indicator, ignore_index=True
-                    )
-                except Exception as e:
-                    logging.info(e)
-            df[indicator] = indicator_df
+            df = pd.merge(df, stock[indicator], on="date")
+
         return df
 
     def add_user_defined_feature(self, data):
@@ -95,11 +85,18 @@ class FeatureEngineer:
         :return: (df) pandas dataframe
         """
         df = data.copy()
-        df["daily_return"] = df.close.pct_change(1)
-        # df['return_lag_1']=df.close.pct_change(2)
-        # df['return_lag_2']=df.close.pct_change(3)
-        # df['return_lag_3']=df.close.pct_change(4)
-        # df['return_lag_4']=df.close.pct_change(5)
+        stock = Sdf.retype(df.copy())
+        stock["macdh_normalize"] = stock['macdh'] / stock['close'] * 100
+        stock["boll_ub_normalize"] = (stock['boll_ub'] - stock['close']) / stock['close'] * 100
+        stock["boll_lb_normalize"] = (stock['boll_lb'] - stock['close']) / stock['close'] * 100
+        stock["close_20_sma_normalize"] = (stock['close_20_sma'] - stock['close']) / stock['close'] * 100
+        stock["close_50_sma_normalize"] = (stock['close_50_sma'] - stock['close']) / stock['close'] * 100
+
+        # stock["macdh_normalize"] = stock['close']
+
+        for user_def in config.USER_DEFINED_LIST:
+            df = pd.merge(df, stock[user_def], on="date")
+
         return df
 
     def add_turbulence(self, data):
