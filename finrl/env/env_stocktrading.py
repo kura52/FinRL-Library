@@ -39,6 +39,25 @@ class StockTradingEnv(gym.Env):
                  is_prediction=False):
         self.day = day
         self.df = df
+
+        self.tic_len = len(self.df.tic.unique())
+        self.ind_len = len(self.df.index.unique())
+
+        self.data_dic = {}
+        self.data_date_dic = {}
+        self.data_close_dic = {}
+        self.state_dic = {}
+        for ind in self.df.index.unique():
+            self.data_dic[ind] = self.df.loc[ind]
+            if self.tic_len > 1:
+                self.data_date_dic[ind] = self.df.loc[ind].date.values[0]
+                self.data_close_dic[ind] = self.data_dic[ind].close.to_numpy()
+                self.state_dic[ind] = np.concatenate([self.data_dic[ind][tech].values for tech in tech_indicator_list])
+            else:
+                self.data_date_dic[ind] = self.df.loc[ind].date
+                self.data_close_dic[ind] = self.data_dic[ind].close
+                self.state_dic[ind] = np.array([self.data_dic[ind][tech] for tech in tech_indicator_list])
+
         self.stock_dim = stock_dim
         self.hmax = hmax
         self.initial_amount = initial_amount
@@ -50,7 +69,7 @@ class StockTradingEnv(gym.Env):
         self.tech_indicator_list = tech_indicator_list
         self.action_space = spaces.Box(low=-1, high=1, shape=(self.action_space,))
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.state_space,))
-        self.data = self.df.loc[self.day, :]
+        self.data = self.data_dic[self.day]
         self.terminal = False
         self.make_plots = make_plots
         self.print_verbosity = print_verbosity
@@ -62,6 +81,7 @@ class StockTradingEnv(gym.Env):
         self.mode = mode
         self.iteration = iteration
         self.is_prediction = is_prediction
+
         # initalize state
         self.state, self.position = self._initiate_state()
 
@@ -72,14 +92,23 @@ class StockTradingEnv(gym.Env):
         self.trades = 0
         self.episode = 0
         # memorize all the total balance change
-        self.asset_memory = [self.initial_amount + sum(np.array(self.position[1:(self.stock_dim+1)])*np.array(self.position[(self.stock_dim+1):(self.stock_dim*2+1)]))]
+        self.asset_memory = [self.initial_amount + sum(self.position[1:(self.stock_dim+1)]*self.position[(self.stock_dim+1):(self.stock_dim*2+1)])]
         self.rewards_memory = []
         self.actions_memory = []
         self.date_memory = [self._get_date()]
         # self.reset()
         self._seed()
 
+        self.future_num = 22
 
+        self.sum_dic = {}
+        for ind in self.df.index.unique():
+            if self.tic_len > 1:
+                d = df.loc[ind, 'date'].values[0]
+            else:
+                d = df.loc[ind, 'date']
+            self.sum_dic[d] = df.loc[ind:ind + self.future_num, ['tic', 'close']].groupby(
+                'tic').apply(np.average).to_numpy()
 
     def _sell_stock(self, index, action):
         def _do_sell_normal():
@@ -173,11 +202,10 @@ class StockTradingEnv(gym.Env):
         plt.close()
 
     def step(self, actions):
-        FUTURE_NUM = 22
         if self.is_prediction:
-            self.terminal = self.day >= len(self.df.index.unique())-1
+            self.terminal = self.day >= self.ind_len-1
         else:
-            self.terminal = self.day >= len(self.df.index.unique())-1-FUTURE_NUM
+            self.terminal = self.day >= self.ind_len-1-self.future_num
 
         if self.terminal:
             # logging.info(f"Episode: {self.episode}")
@@ -233,8 +261,9 @@ class StockTradingEnv(gym.Env):
                     actions=np.array([-self.hmax]*self.stock_dim)
 
             # 現在価格っぽい
-            begin_total_asset = self.position[0]+ \
-            sum(np.array(self.position[1:(self.stock_dim+1)])*np.array(self.position[(self.stock_dim+1):(self.stock_dim*2+1)]))
+            begin_total_asset = self.position[0] + \
+                                sum(self.position[1:(self.stock_dim + 1)] *
+                                    self.position[(self.stock_dim + 1):(self.stock_dim * 2 + 1)])
             current_pos = self.position[(self.stock_dim+1):(self.stock_dim*2+1)]
 
             #logging.info("begin_total_asset:{}".format(begin_total_asset))
@@ -250,15 +279,13 @@ class StockTradingEnv(gym.Env):
                 actions[index] = self._sell_stock(index, actions[index]) * (-1)
                 # logging.info(f'take sell action after : {actions[index]}')
                 # logging.info(f"Num shares after: {self.position[index+self.stock_dim+1]}")
-
             for index in buy_index:
                 # logging.info('take buy action: {}'.format(actions[index]))
                 actions[index] = self._buy_stock(index, actions[index])
-
             self.actions_memory.append(actions)
 
             self.day += 1
-            self.data = self.df.loc[self.day,:]
+            self.data = self.data_dic[self.day]
             if self.turbulence_threshold is not None:
                 if isinstance(self.data['turbulence'], np.float64):
                     self.turbulence = self.data['turbulence']
@@ -269,21 +296,13 @@ class StockTradingEnv(gym.Env):
             after_pos = self.position[(self.stock_dim+1):(self.stock_dim*2+1)]
             change_pos = np.array(after_pos) - np.array(current_pos)
 
-            # 将来の利益を計算
-            if self.is_prediction:
-                my_reward = 0
-            else:
-                if len(self.df.tic.unique()) > 1:
-                    future_val = self.df.loc[self.df.index[self.df.date == self.data.date.iloc[0]][0] + FUTURE_NUM]
-                    my_reward = ((future_val.close.to_numpy() - self.data.close.to_numpy()) / self.data.close.to_numpy() * 100 * change_pos).sum()
-                else:
-                    future_val = self.df.loc[self.df.index[self.df.date == self.data.date][0] + FUTURE_NUM]
-                    my_reward = (future_val.close - self.data.close) / self.data.close * 100 * change_pos[0]
+            my_reward = self.calc_reward(change_pos)
 
             #logger.info(f"after_pos: {after_pos}, current_pos: {current_pos}, my_reward: {my_reward}")
 
-            end_total_asset = self.position[0]+ \
-            sum(np.array(self.position[1:(self.stock_dim+1)])*np.array(self.position[(self.stock_dim+1):(self.stock_dim*2+1)]))
+            end_total_asset = self.position[0] + \
+                              sum(self.position[1:(self.stock_dim + 1)] *
+                                  self.position[(self.stock_dim + 1):(self.stock_dim * 2 + 1)])
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
             self.reward = end_total_asset - begin_total_asset
@@ -293,6 +312,20 @@ class StockTradingEnv(gym.Env):
 
         #logger.info(f"reward: {self.reward}, position: {self.position}, state: {self.state}")
         return self.state, self.reward, self.terminal, {}
+
+    def calc_reward(self, change_pos):
+        # 将来の利益を計算
+        if self.is_prediction:
+            my_reward = 0
+        else:
+            if self.tic_len > 1:
+                future_vals = self.sum_dic[self._get_date()]
+                close = self.data_close_dic[self.day]
+                my_reward = ((future_vals - close) / close * 100 * change_pos).sum()
+            else:
+                future_vals = self.sum_dic[self._get_date()][0]
+                my_reward = (future_vals - self.data.close) / self.data.close * 100 * change_pos[0]
+        return my_reward
 
     def reset(self):
         #initiate state
@@ -304,10 +337,10 @@ class StockTradingEnv(gym.Env):
         #     previous_total_asset = self.previous_state[0]+ \
         #     sum(np.array(self.position[1:(self.stock_dim+1)])*np.array(self.previous_state[(self.stock_dim+1):(self.stock_dim*2+1)]))
         #     self.asset_memory = [previous_total_asset]
-        self.asset_memory = [self.initial_amount + sum(np.array(self.position[1:(self.stock_dim+1)])*np.array(self.position[(self.stock_dim+1):(self.stock_dim*2+1)]))]
+        self.asset_memory = [self.initial_amount + sum(self.position[1:(self.stock_dim+1)]*self.position[(self.stock_dim+1):(self.stock_dim*2+1)])]
 
         self.day = 0
-        self.data = self.df.loc[self.day,:]
+        self.data = self.data_dic[self.day]
         self.turbulence = 0
         self.cost = 0
         self.trades = 0
@@ -327,24 +360,25 @@ class StockTradingEnv(gym.Env):
     def _initiate_state(self):
         if self.initial:
             # For Initial State
-            if len(self.df.tic.unique()) > 1:
+            if self.tic_len > 1:
                 # for multiple stock
                 # 1つ目が保持数？、次にN株分の価格(a,b)、次にN株の0(a,b)、テクニカルの列挙（sumはflatten)(a_t1,b_t1, a_t2,b_t2,...)
-                state = sum([self.data[tech].values.tolist() for tech in self.tech_indicator_list], [])
+                state = self.state_dic[self.day]
 
-                postion = [self.initial_amount] + \
-                          self.data.close.values.tolist() + \
-                          (self.initial_amount // self.data.close.values // self.stock_dim).tolist()
+                position = np.concatenate([[self.initial_amount],
+                                          self.data.close.values,
+                                          (0 // self.data.close.values // self.stock_dim)])
             else:
                 # for single stock
-                state = sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
+                state = self.state_dic[self.day]
 
-                postion = [self.initial_amount] + \
-                          [self.data.close] + \
-                          [self.initial_amount // self.data.close // self.stock_dim]
+                position = np.array([self.initial_amount,
+                                          self.data.close,
+                                          (0 // self.data.close // self.stock_dim)])
+                          # [self.initial_amount // self.data.close // self.stock_dim]
         # else:
         #     # Using Previous State
-        #     if len(self.df.tic.unique()) > 1:
+        #     if self.tic_len > 1:
         #         # for multiple stock
         #         state = [self.previous_state[0]] + \
         #                 self.data.close.values.tolist() + \
@@ -356,33 +390,23 @@ class StockTradingEnv(gym.Env):
         #                 [self.data.close] + \
         #                 self.previous_state[(self.stock_dim + 1):(self.stock_dim * 2 + 1)] + \
         #                 sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
-        return state, postion
+        return state, position
 
     def _update_state(self):
-        if len(self.df.tic.unique()) > 1:
-            # for multiple stock
-            state = sum([self.data[tech].values.tolist() for tech in self.tech_indicator_list], [])
+        state = self.state_dic[self.day]
 
-            postion = [self.position[0]] + \
-                      self.data.close.values.tolist() + \
-                      list(self.position[(self.stock_dim + 1):(self.stock_dim * 2 + 1)])
-
+        if self.tic_len > 1:
+            position = np.concatenate([[self.position[0]],
+                                      self.data.close.values,
+                                      self.position[(self.stock_dim + 1):(self.stock_dim * 2 + 1)]])
         else:
-            # for single stock
-            state = sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
-
-            postion = [self.position[0]] + \
-                      [self.data.close] + \
-                      list(self.position[(self.stock_dim + 1):(self.stock_dim * 2 + 1)])
-
-        return state, postion
+            position = np.array([self.position[0],
+                                self.data.close,
+                                self.position[2]])
+        return state, position
 
     def _get_date(self):
-        if len(self.df.tic.unique())>1:
-            date = self.data.date.unique()[0]
-        else:
-            date = self.data.date
-        return date
+        return self.data_date_dic[self.day]
 
     def save_asset_memory(self):
         date_list = self.date_memory
@@ -393,7 +417,7 @@ class StockTradingEnv(gym.Env):
         return df_account_value
 
     def save_action_memory(self):
-        if len(self.df.tic.unique())>1:
+        if self.tic_len>1:
             # date and close price length must match actions length
             date_list = self.date_memory[:-1]
             df_date = pd.DataFrame(date_list)

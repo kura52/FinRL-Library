@@ -24,7 +24,7 @@ def train_one():
     """
     logging.info("==============Start Fetching Data===========")
 
-    do_download = False
+    do_download = True
     do_feature = True
     do_train = True
 
