@@ -103,11 +103,8 @@ class StockTradingEnv(gym.Env):
 
         self.sum_dic = {}
         for ind in self.df.index.unique():
-            if self.tic_len > 1:
-                d = df.loc[ind, 'date'].values[0]
-            else:
-                d = df.loc[ind, 'date']
-            self.sum_dic[d] = df.loc[ind:ind + self.future_num, ['tic', 'close']].groupby(
+            d = df.loc[ind, 'date'].values[0] if self.tic_len > 1 else df.loc[ind, 'date']
+            self.sum_dic[d] = df.loc[ind+1:ind + self.future_num, ['tic', 'close']].groupby(
                 'tic').apply(np.average).to_numpy()
 
     def _sell_stock(self, index, action):
@@ -264,7 +261,7 @@ class StockTradingEnv(gym.Env):
             begin_total_asset = self.position[0] + \
                                 sum(self.position[1:(self.stock_dim + 1)] *
                                     self.position[(self.stock_dim + 1):(self.stock_dim * 2 + 1)])
-            current_pos = self.position[(self.stock_dim+1):(self.stock_dim*2+1)]
+            current_pos = self.position[(self.stock_dim+1):(self.stock_dim*2+1)].copy()
 
             #logging.info("begin_total_asset:{}".format(begin_total_asset))
 
@@ -298,7 +295,7 @@ class StockTradingEnv(gym.Env):
 
             my_reward = self.calc_reward(change_pos)
 
-            #logger.info(f"after_pos: {after_pos}, current_pos: {current_pos}, my_reward: {my_reward}")
+            logger.info(f"current_pos: {current_pos}, after_pos: {after_pos}, change_pos: {change_pos}, my_reward: {my_reward}")
 
             end_total_asset = self.position[0] + \
                               sum(self.position[1:(self.stock_dim + 1)] *
@@ -310,7 +307,7 @@ class StockTradingEnv(gym.Env):
             self.rewards_memory.append(self.reward)
             self.reward = self.reward*self.reward_scaling
 
-        #logger.info(f"reward: {self.reward}, position: {self.position}, state: {self.state}")
+        logger.info(f"end_total_asset: {end_total_asset}, reward: {self.reward}, position: {self.position}, state: {self.state}")
         return self.state, self.reward, self.terminal, {}
 
     def calc_reward(self, change_pos):
